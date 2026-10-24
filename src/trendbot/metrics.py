@@ -7,7 +7,8 @@ from dataclasses import asdict, dataclass
 
 import pandas as pd
 
-from .backtest import BacktestResult, Trade
+from .backtest import BacktestResult
+from .engine import Trade
 
 DAYS_PER_YEAR = 365  # crypto trades every day
 

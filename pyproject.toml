@@ -8,13 +8,15 @@ authors = [
 ]
 requires-python = ">=3.12"
 dependencies = [
+    "azure-identity>=1.26.0",
+    "azure-storage-blob>=12.31.0",
     "httpx>=0.28.1",
     "numpy>=2.5.4",
     "pandas>=3.1.0",
 ]
 
 [project.scripts]
-trendbot = "trendbot:main"
+trendbot = "trendbot.cli:main"
 
 [build-system]
 requires = ["uv_build>=0.11.29,<0.12.0"]

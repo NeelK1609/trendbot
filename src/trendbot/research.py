@@ -10,7 +10,8 @@ from pathlib import Path
 
 import pandas as pd
 
-from .backtest import Costs, HaltPolicy, buy_and_hold, run_backtest
+from .backtest import buy_and_hold, run_backtest
+from .engine import Costs, HaltPolicy
 from .data import SYMBOLS, load_history, load_kraken, today_utc
 from .metrics import equity_stats, summarize, trade_stats, yearly_returns
 from .strategy import StrategyConfig

@@ -5,7 +5,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from trendbot.backtest import Costs, HaltPolicy, run_backtest
+from trendbot.backtest import run_backtest
+from trendbot.engine import Costs, HaltPolicy
 from trendbot.strategy import (
     StrategyConfig,
     add_indicators,
