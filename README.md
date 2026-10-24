@@ -28,7 +28,7 @@ The backtested engine (`engine.step`) runs once a day on Kraken's real CAD candl
 
 ```bash
 uv run trendbot paper run                     # local account in data/paper-account.json
-uv run trendbot paper status --azure <storage-account>   # opens an HTML status page
+uv run trendbot paper status --azure <storage-account>   # opens an HTML status page (or set TRENDBOT_STORAGE_ACCOUNT)
 uv run trendbot paper resume --azure <storage-account> --note "what you reviewed"
 ```
 
@@ -48,3 +48,29 @@ az functionapp deployment source config-zip -g rg-trendbot -n <function-app> --s
 ```
 
 The status page is `https://<function-app>.azurewebsites.net/api/status?code=<function key>`.
+
+## Live trading on Kraken
+
+The same engine decides; `live.py` turns each decision into a Kraken market order and records the **actual** fill (price, quantity, fee), so the books match the exchange.
+
+**Safeguards**
+
+- **Two switches for real orders**: the account must be in `live` mode (`trendbot live go-live` with a confirmation phrase) **and** the Function App setting `LIVE_TRADING_ENABLED` must be `true`. With either off, Kraken only validates orders (`validate=true`) and fills are simulated. A Bicep redeploy resets the setting to `false`.
+- **Capital cap**: the bot manages only the CAD you give it at `open`, even if the Kraken account holds more.
+- **No double orders**: every order carries a `userref` tag for its day, coin and action; a repeated run finds the existing order instead of placing another.
+- **Fail safe**: an order error, or Kraken balances that don't cover the bot's book, rolls back the unexecuted decisions and pauses trading until you `resume`.
+- **Keys** live in Azure Key Vault; the app's identity can only read them.
+
+**Runbook**
+
+1. On Kraken, create an API key with only: *Query Funds*, *Query Open Orders & Trades*, *Query Closed Orders & Trades*, *Create & Modify Orders*. **Do not allow withdrawals.**
+2. Store it (you'll be prompted; nothing is echoed):
+   ```bash
+   az keyvault secret set --vault-name <vault> --name kraken-api-key --value "$(read -rs k; echo $k)"
+   az keyvault secret set --vault-name <vault> --name kraken-api-secret --value "$(read -rs s; echo $s)"
+   ```
+3. Open a shadow account (needs at least that much CAD on Kraken):
+   `uv run trendbot live open --capital 500 --azure <storage-account> --vault <vault-url>`
+4. Let it run in shadow mode for a while and watch `/api/live-status`.
+5. Go live: `uv run trendbot live go-live --confirm "I understand this trades real money" --azure <storage-account>`, then set `LIVE_TRADING_ENABLED=true` on the Function App.
+6. To stop at any time: `uv run trendbot live pause --reason "..." --azure <storage-account>` or set `LIVE_TRADING_ENABLED=false`.

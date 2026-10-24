@@ -42,7 +42,7 @@ class LocalStore:
 class BlobStore:
     """Azure Blob Storage with Entra ID auth (managed identity in Azure, `az login` locally)."""
 
-    def __init__(self, account: str, container: str = "paper", blob: str = "account.json"):
+    def __init__(self, account: str, container: str, blob: str = "account.json"):
         from azure.identity import DefaultAzureCredential
         from azure.storage.blob import BlobServiceClient
 

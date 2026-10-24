@@ -58,10 +58,17 @@ def _coin_status(symbol: str, signal: dict, pf: Portfolio) -> tuple[str, str]:
     return "muted", "Waiting: 20-day average is below the 50-day average"
 
 
-def render_status(state: dict | None, now: date | None = None) -> str:
+MODE_NOTES = {
+    "paper": "Paper account: no real money is involved.",
+    "shadow": "Shadow account: real Kraken keys and prices, every order validated by Kraken but none executed.",
+    "live": "Live account: real orders on Kraken.",
+}
+
+
+def render_status(state: dict | None, now: date | None = None, empty: str = "No paper account yet. It opens on the first daily run after 00:10 UTC.") -> str:
     if state is None:
-        body = '<p>No paper account yet. It opens on the first daily run after 00:10 UTC.</p>'
-        return _page(body)
+        return _page(f"<p>{escape(empty)}</p>", "PAPER")
+    mode = state.get("mode", "paper")
 
     pf = Portfolio.from_dict(state["portfolio"])
     cfg = StrategyConfig(**state["config"])
@@ -74,8 +81,8 @@ def render_status(state: dict | None, now: date | None = None) -> str:
 
     banner = ""
     if paused:
-        banner = ('<div class="banner" role="alert"><strong>Trading is paused.</strong> The account fell '
-                  f"{cfg.max_drawdown:.0%} from its peak. Review it, then run <code>trendbot paper resume</code>.</div>")
+        banner = ('<div class="banner" role="alert"><strong>Trading is paused.</strong> '
+                  f"See the account log for why, then run <code>trendbot {'paper' if mode == 'paper' else 'live'} resume</code>.</div>")
 
     tiles = f"""
       <div class="tiles">
@@ -133,16 +140,16 @@ def render_status(state: dict | None, now: date | None = None) -> str:
       <section><h2>Recent decisions</h2><div class="scroll"><table><thead><tr><th>Day</th><th>Action</th><th>Coin</th><th>Price</th><th>Why</th></tr></thead><tbody>{decision_rows}</tbody></table></div></section>
       <section><h2>Closed trades</h2><div class="scroll"><table><thead><tr><th>Coin</th><th>Bought</th><th>Sold</th><th>Return</th><th>Profit</th><th>Why it sold</th></tr></thead><tbody>{trade_rows}</tbody></table></div></section>
       <section><h2>Account log</h2><ul class="log">{events}</ul></section>
-      <p class="muted">Paper account on Kraken CAD prices with {state['costs']['fee_rate']:.2%} fees and {state['costs']['slippage']:.2%} slippage per side.
+      <p class="muted">Kraken CAD prices, modelled with {state['costs']['fee_rate']:.2%} fees and {state['costs']['slippage']:.2%} slippage per side.
         Risk per trade {cfg.risk_per_trade:.0%}, at most {cfg.max_coin_fraction:.0%} in one coin. Last processed day: {escape(state['last_day'])}.
-        Runs daily at 00:10 UTC. No real money is involved.</p>"""
-    return _page(body)
+        Runs daily just after the 00:00 UTC close. {escape(MODE_NOTES[mode])}</p>"""
+    return _page(body, mode.upper())
 
 
-def _page(body: str) -> str:
+def _page(body: str, mode: str) -> str:
     return f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="robots" content="noindex"><title>Trendbot paper account</title>
+<meta name="robots" content="noindex"><title>Trendbot {mode.lower()} account</title>
 <style>
   :root {{ --bg: #f7f8f6; --panel: #ffffff; --fg: #17201b; --muted: #5d6b63; --line: #dfe4e0; --accent: #1f7a5a; --good: #1f7a5a; --bad: #b4372c; --warn: #9a6400; color-scheme: light; }}
   @media (prefers-color-scheme: dark) {{ :root {{ --bg: #111614; --panel: #18201c; --fg: #e6ece8; --muted: #9aa8a0; --line: #2b3530; --accent: #5cc39b; --good: #5cc39b; --bad: #f08a7e; --warn: #e3b25a; color-scheme: dark; }} }}
@@ -151,6 +158,7 @@ def _page(body: str) -> str:
   main {{ max-width: 60rem; margin: 0 auto; padding: 24px max(16px, env(safe-area-inset-left)) 48px; display: grid; gap: 24px; }}
   h1 {{ font-size: 1.5rem; margin: 0; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }}
   h2 {{ font-size: 1rem; margin: 0 0 8px; }}
+  .pill.live {{ color: var(--bad); border-color: var(--bad); }}
   .pill {{ font-size: .75rem; font-weight: 600; letter-spacing: .06em; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }}
   .tiles {{ display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); }}
   .tiles > div {{ background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px; display: grid; gap: 4px; }}
@@ -169,4 +177,4 @@ def _page(body: str) -> str:
   .log {{ margin: 0; padding-left: 18px; display: grid; gap: 4px; }}
   code {{ font-family: ui-monospace, monospace; font-size: .9em; }}
 </style></head>
-<body><main><h1>Trendbot <span class="pill">PAPER</span></h1>{body}</main></body></html>"""
+<body><main><h1>Trendbot <span class="pill{' live' if mode == 'LIVE' else ''}">{mode}</span></h1>{body}</main></body></html>"""
