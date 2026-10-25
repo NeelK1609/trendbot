@@ -43,6 +43,7 @@ def main(argv: list[str] | None = None) -> None:
     for name, actions, default in [
         ("paper", ["run", "status", "resume"], "data/paper-account.json"),
         ("live", ["open", "run", "status", "go-live", "pause", "resume"], "data/live-account.json"),
+        ("demo", ["buy", "run", "status"], "data/demo-account.json"),
     ]:
         sub = commands.add_parser(name, help=f"{name.title()} trading")
         sub.add_argument("action", choices=actions)
@@ -50,6 +51,9 @@ def main(argv: list[str] | None = None) -> None:
         where.add_argument("--local", default=default, help="Account file (default: %(default)s)")
         where.add_argument("--azure", default=os.environ.get("TRENDBOT_STORAGE_ACCOUNT"), help="Azure storage account name")
         sub.add_argument("--note", help="resume: what you reviewed")
+        if name == "demo":
+            sub.add_argument("--cad", type=float, default=10.0, help="buy: CAD to spend (default: %(default)s)")
+            sub.add_argument("--coin", choices=["BTC", "ETH"], default="BTC")
         if name == "live":
             sub.add_argument("--vault", default=os.environ.get("KRAKEN_VAULT_URL"), help="Key Vault URL holding the Kraken API key")
             sub.add_argument("--capital", type=float, help="open: CAD the bot may manage")
@@ -65,7 +69,22 @@ def main(argv: list[str] | None = None) -> None:
 
     from .paper import resume
 
-    store = _store(args, "paper" if args.command == "paper" else "live")
+    store = _store(args, "live" if args.command == "live" else "paper") if args.command != "demo" else (
+        BlobStore(args.azure, "paper", "demo.json") if args.azure else LocalStore(Path(args.local)))
+
+    if args.command == "demo":
+        from .kraken import KrakenClient
+        from .paper import open_demo, run_daily
+
+        if args.action == "buy":
+            _, ask = KrakenClient().ticker(args.coin)
+            state = open_demo(store, args.coin, args.cad, ask)
+            print(state["events"][-1]["detail"])
+        elif args.action == "run":
+            _print_records(run_daily(store))
+        else:
+            _show(store.load()[0], "demo", "No demo account yet. Create one with: trendbot demo buy")
+        return
 
     if args.command == "paper":
         from .paper import run_daily

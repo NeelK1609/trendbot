@@ -14,8 +14,8 @@ from trendbot.store import BlobStore
 app = func.FunctionApp()
 
 
-def _store(container: str) -> BlobStore:
-    return BlobStore(os.environ["PAPER_STORAGE_ACCOUNT"], container)
+def _store(container: str, blob: str = "account.json") -> BlobStore:
+    return BlobStore(os.environ["PAPER_STORAGE_ACCOUNT"], container, blob)
 
 
 def _log(name: str, records: list[dict]) -> None:
@@ -31,6 +31,9 @@ def _log(name: str, records: list[dict]) -> None:
 @app.timer_trigger(schedule="0 10 0,6,18 * * *", arg_name="timer", run_on_startup=False, use_monitor=True)
 def daily_paper_run(timer: func.TimerRequest) -> None:
     _log("Paper", run_daily(_store("paper")))
+    demo = _store("paper", "demo.json")
+    if demo.load()[0] is not None:
+        _log("Demo", run_daily(demo))
 
 
 # Ten minutes after the paper run. Does nothing until a live account is opened with `trendbot live open`.
@@ -55,4 +58,11 @@ def status(req: func.HttpRequest) -> func.HttpResponse:
 def live_status(req: func.HttpRequest) -> func.HttpResponse:
     state, _ = _store("live").load()
     page = render_status(state, empty="No live account yet. Open one with: trendbot live open --capital 500")
+    return func.HttpResponse(page, mimetype="text/html", headers={"Cache-Control": "no-store"})
+
+
+@app.route(route="demo-status", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
+def demo_status(req: func.HttpRequest) -> func.HttpResponse:
+    state, _ = _store("paper", "demo.json").load()
+    page = render_status(state, empty="No demo account yet. Create one with: trendbot demo buy")
     return func.HttpResponse(page, mimetype="text/html", headers={"Cache-Control": "no-store"})

@@ -5,7 +5,7 @@ import pandas as pd
 import pytest
 
 from trendbot.engine import Portfolio
-from trendbot.paper import resume, run_daily
+from trendbot.paper import open_demo, resume, run_daily
 from trendbot.store import ConflictError, LocalStore
 
 TODAY = date(2026, 6, 1)
@@ -96,3 +96,20 @@ def test_portfolio_round_trips_through_json(store):
     pf = Portfolio.from_dict(state["portfolio"])
     assert pf.to_dict() == state["portfolio"]
     assert np.isclose(pf.equity(), state["days"][-1]["equity"], atol=0.01)
+
+
+def test_demo_buy_is_then_managed_by_the_rules(store):
+    # Downtrend: the rules would never buy, so the forced demo position is sold on the next run.
+    down = [200.0 - i * 0.5 for i in range(200)]
+    end = TODAY
+    open_demo(store, "BTC", 10.0, ask_price=down[-1], today=TODAY)
+    state, _ = store.load()
+    pf = Portfolio.from_dict(state["portfolio"])
+    assert state["mode"] == "demo"
+    assert pf.positions["BTC"].trade.quantity * pf.positions["BTC"].trade.entry_price + pf.positions["BTC"].trade.entry_fee <= 10.0
+    assert pf.cash >= 0
+
+    tomorrow = TODAY + timedelta(days=1)
+    records = run_daily(store, lambda: {"BTC": kraken_like(down, end), "ETH": kraken_like([50.0] * 200, end)}, tomorrow)
+    assert [a["kind"] for a in records[0]["actions"]] == ["sell"]
+    assert records[0]["actions"][0]["reason"] == "trend_break"

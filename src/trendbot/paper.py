@@ -90,6 +90,37 @@ def run_daily(store: Store, fetch: Fetcher = fetch_kraken, today: date | None = 
     return records
 
 
+def open_demo(store: Store, symbol: str, cad: float, ask_price: float, today: date | None = None,
+              cfg: StrategyConfig = StrategyConfig(), costs: Costs = Costs()) -> dict:
+    """A demo account that buys `symbol` right away with all its cash, outside the rules, to show how trades appear.
+
+    From the next daily run the rules manage the position like any other (they may sell it straight away).
+    """
+    from .engine import Position, Trade
+
+    today = today or today_utc()
+    if store.load()[0] is not None:
+        raise RuntimeError("A demo account already exists.")
+    state = new_account(today, cad, cfg, costs)
+    state["mode"] = "demo"
+    pf = Portfolio.from_dict(state["portfolio"])
+    quantity = round(cad / (ask_price * (1 + costs.fee_rate)) - 5e-9, 8)  # round down to 8 decimals
+    fee = quantity * ask_price * costs.fee_rate
+    pf.cash -= quantity * ask_price + fee
+    pf.positions[symbol] = Position(Trade(symbol, today, ask_price, quantity, fee), ask_price)
+    pf.last_close[symbol] = ask_price
+    state["portfolio"] = pf.to_dict()
+    now = datetime.now(UTC).isoformat(timespec="seconds")
+    state["events"] = [
+        {"at": now, "kind": "opened", "detail": f"Demo account opened with ${cad:,.2f} CAD"},
+        {"at": now, "kind": "demo_buy", "detail": f"Demo buy outside the rules: {quantity:.8f} {symbol} at ${ask_price:,.2f} "
+                                                  f"(Kraken's live ask) for ${quantity * ask_price:,.2f} + ${fee:,.2f} fee. "
+                                                  "From the next daily run, the rules manage it."},
+    ]
+    store.save(state, None)
+    return state
+
+
 def resume(store: Store, note: str) -> None:
     """Records that a person reviewed a drawdown halt and restarts trading."""
     state, version = store.load()

@@ -60,6 +60,7 @@ def _coin_status(symbol: str, signal: dict, pf: Portfolio) -> tuple[str, str]:
 
 MODE_NOTES = {
     "paper": "Paper account: no real money is involved.",
+    "demo": "Demo account: one buy made outside the rules to show how trades appear, then managed by the rules. No real money is involved.",
     "shadow": "Shadow account: real Kraken keys and prices, every order validated by Kraken but none executed.",
     "live": "Live account: real orders on Kraken.",
 }
@@ -74,8 +75,8 @@ def render_status(state: dict | None, now: date | None = None, empty: str = "No 
     cfg = StrategyConfig(**state["config"])
     days = state["days"]
     initial = state["initial_cash"]
-    equity = days[-1]["equity"] if days else initial
-    invested = days[-1]["invested"] if days else 0.0
+    equity = days[-1]["equity"] if days else pf.equity()
+    invested = days[-1]["invested"] if days else pf.invested()
     peak = max([initial] + [d["equity"] for d in days])
     paused = pf.paused_until is not None
 
@@ -108,7 +109,7 @@ def render_status(state: dict | None, now: date | None = None, empty: str = "No 
 
     positions = "".join(
         f"<tr><td>{escape(s)}</td><td>{escape(p.trade.entry_date.isoformat())}</td><td>{_money(p.trade.entry_price)}</td>"
-        f"<td>{p.trade.quantity:.6f}</td><td>{_money(p.trade.quantity * pf.last_close[s])}</td>"
+        f"<td>{p.trade.quantity:.8f}</td><td>{_money(p.trade.quantity * pf.last_close[s])}</td>"
         f"<td class='{'good' if pf.last_close[s] >= p.trade.entry_price else 'bad'}'>{_pct(pf.last_close[s] / p.trade.entry_price - 1)}</td></tr>"
         for s, p in pf.positions.items()
     ) or "<tr><td colspan='6' class='muted'>No open positions. The account is in cash.</td></tr>"
@@ -135,7 +136,7 @@ def render_status(state: dict | None, now: date | None = None, empty: str = "No 
       {banner}
       {tiles}
       <section><h2>Account value</h2>{_sparkline([initial] + [d['equity'] for d in days])}</section>
-      <section>{coins}</section>
+      {f"<section>{coins}</section>" if coins else ""}
       <section><h2>Open positions</h2><div class="scroll"><table><thead><tr><th>Coin</th><th>Bought</th><th>Buy price</th><th>Quantity</th><th>Value</th><th>Change</th></tr></thead><tbody>{positions}</tbody></table></div></section>
       <section><h2>Recent decisions</h2><div class="scroll"><table><thead><tr><th>Day</th><th>Action</th><th>Coin</th><th>Price</th><th>Why</th></tr></thead><tbody>{decision_rows}</tbody></table></div></section>
       <section><h2>Closed trades</h2><div class="scroll"><table><thead><tr><th>Coin</th><th>Bought</th><th>Sold</th><th>Return</th><th>Profit</th><th>Why it sold</th></tr></thead><tbody>{trade_rows}</tbody></table></div></section>
