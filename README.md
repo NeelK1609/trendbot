@@ -20,6 +20,8 @@ uv run pytest
 
 Backtests use Coinbase USD candles converted to CAD with the Bank of Canada daily rate (Kraken's public API only has ~2 years); this matches Kraken's real CAD closes to within 0.2% on average. Costs: 0.40% fee + 0.10% slippage per side.
 
+**New here? Start with [docs/GUIDE.md](docs/GUIDE.md)**: what the bot does, what to expect, and how to go from paper to real money safely.
+
 This is a research tool, not financial advice. Past results don't predict future returns.
 
 ## Paper trading
